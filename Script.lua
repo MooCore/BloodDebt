@@ -2,7 +2,7 @@ if not game:IsLoaded() then
     game.Loaded:Wait()
 end
 
-local TARGET_PLACE_ID = 79187287306411
+local TARGET_PLACE_ID = 
 
 if game.PlaceId ~= TARGET_PLACE_ID then
     warn(string.format(
