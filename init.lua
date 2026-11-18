@@ -13,7 +13,7 @@ if game.PlaceId ~= TARGET_PLACE_ID then
     return
 end
 
-local REPO_BASE_URL = "https://raw.githubusercontent.com/john203221/BloodDebt/main/"
+local REPO_BASE_URL = "https://raw.githubusercontent.com/MooCore/BloodDebt/refs/heads/main/"
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
