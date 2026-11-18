@@ -1,5 +1,175 @@
 ESPObjects = {}
 
+LobbyOutfitSignatureCache = setmetatable({}, { __mode = "k" })
+
+function getCharacterOutfitSignature(character)
+    if not character then
+        return nil
+    end
+    local now = os.clock()
+    local cached = LobbyOutfitSignatureCache[character]
+    if cached and now - cached.CheckedAt < 1.5 then
+        return cached.Signature
+    end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then
+        return nil
+    end
+    local pieces = {}
+    local function add(name, value)
+        table.insert(pieces, tostring(name) .. "=" .. tostring(value or ""))
+    end
+    local descriptionOK, description = pcall(function()
+        return humanoid:GetAppliedDescription()
+    end)
+    if descriptionOK and description then
+        local properties = {
+            "Shirt", "Pants", "GraphicTShirt", "Face", "Head", "Torso",
+            "LeftArm", "RightArm", "LeftLeg", "RightLeg", "HeadColor",
+            "TorsoColor", "LeftArmColor", "RightArmColor", "LeftLegColor",
+            "RightLegColor", "BodyTypeScale", "ProportionScale", "HeightScale",
+            "WidthScale", "DepthScale", "HeadScale", "HatAccessory",
+            "HairAccessory", "FaceAccessory", "NeckAccessory", "ShouldersAccessory",
+            "FrontAccessory", "BackAccessory", "WaistAccessory",
+        }
+        for _, propertyName in ipairs(properties) do
+            local ok, value = pcall(function()
+                return description[propertyName]
+            end)
+            if ok then
+                add(propertyName, value)
+            end
+        end
+        local accessoriesOK, accessories = pcall(function()
+            return description:GetAccessories(true)
+        end)
+        if accessoriesOK and type(accessories) == "table" then
+            local accessoryParts = {}
+            for _, accessory in ipairs(accessories) do
+                table.insert(accessoryParts, table.concat({
+                    tostring(accessory.AssetId or ""),
+                    tostring(accessory.AccessoryType or ""),
+                    tostring(accessory.IsLayered or false),
+                    tostring(accessory.Order or 0),
+                    tostring(accessory.Puffiness or 0),
+                }, ":"))
+            end
+            table.sort(accessoryParts)
+            add("Accessories", table.concat(accessoryParts, ";"))
+        end
+    end
+    for _, child in ipairs(character:GetChildren()) do
+        if child:IsA("Shirt") then
+            add("ShirtInstance", child.ShirtTemplate)
+        elseif child:IsA("Pants") then
+            add("PantsInstance", child.PantsTemplate)
+        elseif child:IsA("ShirtGraphic") then
+            add("GraphicInstance", child.Graphic)
+        elseif child:IsA("BodyColors") then
+            add("BodyColors", table.concat({
+                tostring(child.HeadColor3), tostring(child.TorsoColor3),
+                tostring(child.LeftArmColor3), tostring(child.RightArmColor3),
+                tostring(child.LeftLegColor3), tostring(child.RightLegColor3),
+            }, ":"))
+        elseif child:IsA("CharacterMesh") then
+            add("CharacterMesh", table.concat({
+                tostring(child.BodyPart), tostring(child.MeshId), tostring(child.BaseTextureId),
+            }, ":"))
+        elseif child:IsA("Accessory") then
+            local handle = child:FindFirstChild("Handle")
+            local detail = child.Name
+            if handle and handle:IsA("BasePart") then
+                detail = detail .. ":" .. tostring(handle.Color) .. ":" .. tostring(handle.Material)
+                local mesh = handle:FindFirstChildWhichIsA("SpecialMesh")
+                if mesh then
+                    detail = detail .. ":" .. tostring(mesh.MeshId) .. ":" .. tostring(mesh.TextureId)
+                elseif handle:IsA("MeshPart") then
+                    detail = detail .. ":" .. tostring(handle.MeshId) .. ":" .. tostring(handle.TextureID)
+                end
+            end
+            add("AccessoryInstance", detail)
+        end
+    end
+    local bodyPartNames = {
+        "Head", "Torso", "UpperTorso", "LowerTorso", "Left Arm", "Right Arm",
+        "Left Leg", "Right Leg", "LeftUpperArm", "RightUpperArm", "LeftUpperLeg", "RightUpperLeg",
+    }
+    for _, partName in ipairs(bodyPartNames) do
+        local part = character:FindFirstChild(partName)
+        if part and part:IsA("BasePart") then
+            local detail = tostring(part.Color) .. ":" .. tostring(part.Material)
+            if part:IsA("MeshPart") then
+                detail = detail .. ":" .. tostring(part.MeshId) .. ":" .. tostring(part.TextureID)
+            else
+                local mesh = part:FindFirstChildWhichIsA("SpecialMesh")
+                if mesh then
+                    detail = detail .. ":" .. tostring(mesh.MeshId) .. ":" .. tostring(mesh.TextureId)
+                end
+            end
+            add("BodyPart_" .. partName, detail)
+        end
+    end
+    table.sort(pieces)
+    local signature = table.concat(pieces, "|")
+    if signature == "" then
+        return nil
+    end
+    LobbyOutfitSignatureCache[character] = {
+        Signature = signature,
+        CheckedAt = now,
+    }
+    return signature
+end
+
+function playerHasAnyGear(player, character)
+    if not player or not character then
+        return true
+    end
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then
+        return true
+    end
+    local function hasTool(container)
+        if not container then
+            return false
+        end
+        local ok, found = pcall(function()
+            return container:FindFirstChildWhichIsA("Tool", true)
+        end)
+        return ok and found ~= nil
+    end
+    return hasTool(backpack) or hasTool(character)
+end
+
+function isSharedLobbyAppearance()
+    local players = Players:GetPlayers()
+    if #players < 2 then
+        return false
+    end
+    local sharedSignature = nil
+    local checkedPlayers = 0
+    for _, player in ipairs(players) do
+        local character = player.Character
+        if not character or not character:IsDescendantOf(Workspace) then
+            return false
+        end
+        if playerHasAnyGear(player, character) then
+            return false
+        end
+        local signature = getCharacterOutfitSignature(character)
+        if not signature then
+            return false
+        end
+        if not sharedSignature then
+            sharedSignature = signature
+        elseif signature ~= sharedSignature then
+            return false
+        end
+        checkedPlayers = checkedPlayers + 1
+    end
+    return checkedPlayers == #players and sharedSignature ~= nil
+end
+
 function resolveExplicitRoleText(value, activeMap, activeModifier)
     if type(value) ~= "string" or value == "" then
         return nil
@@ -131,10 +301,8 @@ function getRole(player)
     end
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.MaxHealth > 125 then
-            if activeMap.Roles and activeMap.Roles.Juggernaut then
-                return activeMap.Roles.Juggernaut, bestWeapon
-            elseif humanoid.MaxHealth >= 1500 then
+        if humanoid then
+            if humanoid.MaxHealth >= 1500 then
                 return "Juggernaut: Stanislav / Mstislav", bestWeapon
             elseif humanoid.MaxHealth >= 500 then
                 return "Juggernaut: Former Paratrooper", bestWeapon
@@ -272,7 +440,7 @@ function clearAllPlayerESP()
 end
 
 function createESP(player)
-    if not Config.ESPEnabled or not Config.ScriptReady or not ScriptAlive or not isMatchActive() then
+    if not Config.ESPEnabled or not Config.ScriptReady or not ScriptAlive or not isMatchActive() or isSharedLobbyAppearance() then
         return
     end
     if ESPObjects[player] or player == LocalPlayer then
@@ -340,7 +508,7 @@ function updateESP()
         end
         return
     end
-    if not isMatchActive() then
+    if not isMatchActive() or isSharedLobbyAppearance() then
         clearAllPlayerESP()
         return
     end

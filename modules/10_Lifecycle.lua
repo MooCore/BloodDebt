@@ -154,8 +154,9 @@ loadingStartedAt = os.clock()
 while ScriptAlive and ScreenGui.Parent do
     local elapsed = os.clock() - loadingStartedAt
     local progress = math.clamp(elapsed / LOADING_DURATION, 0, 1)
-    ProgressFill.Size = UDim2.new(progress, 0, 1, 0)
-    LoadingPercent.Text = string.format("%d%%", math.floor(progress * 100 + 0.5))
+    if type(__BloodDebtBootstrapUpdate) == "function" then
+        __BloodDebtBootstrapUpdate("Finalizing player detection and interface...", progress)
+    end
     if progress >= 1 then
         break
     end
@@ -184,16 +185,5 @@ if isMatchActive() then
         end
     end
 end
-
-if LoadingFrame and LoadingFrame.Parent then
-    LoadingFrame:Destroy()
-end
-
-notify(
-    "Initialization Complete",
-    "Blood Debt features have been initialized successfully.",
-    Icons.Success,
-    Sounds.Notification
-)
 
 warn("Blood Debt script loaded for PlaceId 79187287306411: responsive UI, map-aware role ESP, sound notifications, controller support, and post-match cleanup.")
