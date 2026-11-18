@@ -123,12 +123,9 @@ end
 
 function playerHasAnyGear(player, character)
     if not player or not character then
-        return true
+        return false
     end
     local backpack = player:FindFirstChild("Backpack")
-    if not backpack then
-        return true
-    end
     local function hasTool(container)
         if not container then
             return false
@@ -139,6 +136,13 @@ function playerHasAnyGear(player, character)
         return ok and found ~= nil
     end
     return hasTool(backpack) or hasTool(character)
+end
+
+function isLobbyPlayer(player, character)
+    if not player or not character or not character:IsDescendantOf(Workspace) then
+        return true
+    end
+    return not playerHasAnyGear(player, character)
 end
 
 function isSharedLobbyAppearance()
@@ -212,6 +216,9 @@ function getRole(player)
     end
     activeMap = liveMap
     local character = player.Character
+    if isLobbyPlayer(player, character) then
+        return "Innocent", nil
+    end
     local backpack = player:FindFirstChild("Backpack")
     local equippedVigilanteGun = nil
     local hasBystanderProp = false
@@ -298,22 +305,6 @@ function getRole(player)
     end
     if bestRole and bestRole ~= "Bystander" and bestRole ~= "Team War" then
         return bestRole, bestWeapon
-    end
-    if character then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            if humanoid.MaxHealth >= 1500 then
-                return "Juggernaut: Stanislav / Mstislav", bestWeapon
-            elseif humanoid.MaxHealth >= 500 then
-                return "Juggernaut: Former Paratrooper", bestWeapon
-            elseif humanoid.MaxHealth == 250 then
-                return "Juggernaut: The Bear", bestWeapon
-            end
-        end
-        local charMatch = KNOWN_ROLE_NAMES[normalizeWeaponName(character.Name)]
-        if charMatch and string.find(charMatch, "Juggernaut", 1, true) then
-            return charMatch, bestWeapon
-        end
     end
     if team and team.Name ~= "" then
         local normTeam = normalizeWeaponName(team.Name)
@@ -447,7 +438,7 @@ function createESP(player)
         return
     end
     local character = player.Character
-    if not character or not character:IsDescendantOf(Workspace) then
+    if isLobbyPlayer(player, character) then
         return
     end
     local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -468,27 +459,57 @@ function createESP(player)
         highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         highlight.Parent = ScreenGui
     end
+    local billboardWidth = IS_MOBILE and 202 or 236
+    local billboardHeight = IS_MOBILE and 44 or 48
     local billboardGui = Instance.new("BillboardGui")
     billboardGui.Name = "ESPRole_" .. tostring(player.UserId)
     billboardGui.Adornee = rootPart
-    billboardGui.Size = UDim2.new(0, 260, 0, 50)
+    billboardGui.Size = UDim2.fromOffset(billboardWidth, billboardHeight)
     billboardGui.AlwaysOnTop = true
-    billboardGui.StudsOffset = Vector3.new(0, 3.5, 0)
+    billboardGui.StudsOffset = Vector3.new(0, IS_MOBILE and 3.35 or 3.6, 0)
     billboardGui.Parent = ScreenGui
+
     local roleText = Instance.new("TextLabel")
+    roleText.Name = "RoleText"
     roleText.Parent = billboardGui
-    roleText.Size = UDim2.new(1, 0, 1, 0)
-    roleText.Position = UDim2.new(0, 0, 0, 0)
+    roleText.Size = UDim2.new(1, -10, 0, 22)
+    roleText.Position = UDim2.fromOffset(5, 0)
     roleText.Text = "Innocent"
     roleText.TextColor3 = Color3.new(0, 1, 0)
     roleText.BackgroundTransparency = 1
-    roleText.TextStrokeTransparency = 0
-    roleText.Font = Enum.Font.SourceSansBold
-    roleText.TextSize = 13
+    roleText.TextStrokeTransparency = 0.2
+    roleText.Font = Enum.Font.GothamBold
+    roleText.TextSize = IS_MOBILE and 12 or 14
+    roleText.TextXAlignment = Enum.TextXAlignment.Center
+    roleText.TextYAlignment = Enum.TextYAlignment.Center
+    roleText.TextTruncate = Enum.TextTruncate.AtEnd
+    roleText.TextWrapped = false
+
+    local healthTrack = Instance.new("Frame")
+    healthTrack.Name = "HealthTrack"
+    healthTrack.Position = UDim2.new(0, 9, 1, -13)
+    healthTrack.Size = UDim2.new(1, -18, 0, IS_MOBILE and 7 or 8)
+    healthTrack.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    healthTrack.BorderSizePixel = 0
+    healthTrack.ClipsDescendants = true
+    healthTrack.Parent = billboardGui
+    createCorner(healthTrack, 5)
+
+    local initialHealth = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
+    local healthFill = Instance.new("Frame")
+    healthFill.Name = "HealthFill"
+    healthFill.Size = UDim2.new(initialHealth, 0, 1, 0)
+    healthFill.BackgroundColor3 = Color3.fromRGB(75, 210, 120)
+    healthFill.BorderSizePixel = 0
+    healthFill.Parent = healthTrack
+    createCorner(healthFill, 5)
+
     ESPObjects[player] = {
         Highlight = highlight,
         Billboard = billboardGui,
         RoleText = roleText,
+        HealthTrack = healthTrack,
+        HealthFill = healthFill,
         Character = character,
         Humanoid = humanoid,
         RootPart = rootPart,
@@ -519,7 +540,8 @@ function updateESP()
         local humanoidValid = esp.Humanoid and esp.Humanoid.Parent and esp.Humanoid.Health > 0
         local rootValid = esp.RootPart and esp.RootPart.Parent
         local playerValid = player.Parent == Players and player.Character == esp.Character
-        if not playerValid or not characterValid or not humanoidValid or not rootValid then
+        local gearValid = characterValid and playerHasAnyGear(player, esp.Character)
+        if not playerValid or not characterValid or not humanoidValid or not rootValid or not gearValid then
             table.insert(stalePlayers, player)
         elseif currentTime - esp.LastUpdate > 0.6 then
             esp.LastUpdate = currentTime
@@ -538,6 +560,17 @@ function updateESP()
             if esp.RoleText then
                 esp.RoleText.Text = roleLabel
                 esp.RoleText.TextColor3 = roleColor
+            end
+        end
+        if humanoidValid and esp.HealthFill then
+            local healthRatio = math.clamp(esp.Humanoid.Health / math.max(esp.Humanoid.MaxHealth, 1), 0, 1)
+            esp.HealthFill.Size = UDim2.new(healthRatio, 0, 1, 0)
+            if healthRatio > 0.6 then
+                esp.HealthFill.BackgroundColor3 = Color3.fromRGB(75, 210, 120)
+            elseif healthRatio > 0.3 then
+                esp.HealthFill.BackgroundColor3 = Color3.fromRGB(245, 190, 75)
+            else
+                esp.HealthFill.BackgroundColor3 = Color3.fromRGB(235, 75, 75)
             end
         end
     end

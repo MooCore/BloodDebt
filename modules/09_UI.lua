@@ -65,13 +65,14 @@ ReopenButton.ZIndex = 30
 createStroke(ReopenButton, Color3.fromRGB(255, 45, 65), 1.5)
 
 viewport = getViewportSize()
-panelWidth = IS_MOBILE and math.max(210, math.min(280, viewport.X - 82)) or 300
+panelWidth = IS_MOBILE and math.max(180, math.min(280, viewport.X - 82)) or 300
 panelHeight = IS_MOBILE and 300 or 316
 
 SettingsPanel = Instance.new("Frame")
 SettingsPanel.Name = "SettingsPanel"
 SettingsPanel.Size = UDim2.fromOffset(panelWidth, panelHeight)
-SettingsPanel.Position = IS_MOBILE and UDim2.new(0, 66, 0.5, -panelHeight / 2) or UDim2.new(0.5, -150, 0, 82)
+mobilePanelX = math.min(66, math.max(8, viewport.X - panelWidth - 12))
+SettingsPanel.Position = IS_MOBILE and UDim2.new(0, mobilePanelX, 0.5, -panelHeight / 2) or UDim2.new(0.5, -panelWidth / 2, 0, 82)
 SettingsPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 SettingsPanel.BorderSizePixel = 0
 SettingsPanel.Visible = false
@@ -99,6 +100,8 @@ PanelTitle.TextColor3 = Color3.new(1, 1, 1)
 PanelTitle.TextSize = IS_MOBILE and 14 or 16
 PanelTitle.Font = Enum.Font.GothamBold
 PanelTitle.TextXAlignment = Enum.TextXAlignment.Left
+PanelTitle.TextYAlignment = Enum.TextYAlignment.Center
+PanelTitle.TextTruncate = Enum.TextTruncate.AtEnd
 PanelTitle.ZIndex = 21
 PanelTitle.Parent = SettingsPanel
 
@@ -125,6 +128,9 @@ PanelDescription.TextColor3 = Color3.fromRGB(190, 190, 198)
 PanelDescription.TextSize = IS_MOBILE and 9 or 11
 PanelDescription.Font = Enum.Font.Gotham
 PanelDescription.TextXAlignment = Enum.TextXAlignment.Left
+PanelDescription.TextYAlignment = Enum.TextYAlignment.Center
+PanelDescription.TextTruncate = Enum.TextTruncate.AtEnd
+PanelDescription.TextWrapped = false
 PanelDescription.ZIndex = 21
 PanelDescription.Parent = SettingsPanel
 
@@ -138,8 +144,12 @@ function createTextButton(parent, name, text, position)
     button.Text = text
     button.TextColor3 = Color3.new(1, 1, 1)
     button.TextSize = IS_MOBILE and 10 or 12
-    button.TextScaled = IS_MOBILE
+    button.TextScaled = false
     button.Font = Enum.Font.GothamSemibold
+    button.TextXAlignment = Enum.TextXAlignment.Center
+    button.TextYAlignment = Enum.TextYAlignment.Center
+    button.TextTruncate = Enum.TextTruncate.AtEnd
+    button.TextWrapped = false
     button.AutoButtonColor = true
     button.ZIndex = 21
     button.Parent = parent
@@ -151,8 +161,8 @@ buttonYPositions = IS_MOBILE and { 68, 106, 144, 182, 220, 258 } or { 72, 112, 1
 
 WeaponESPToggleButton = createTextButton(SettingsPanel, "WeaponESPToggle", "Vigilante Weapon ESP: ON", UDim2.fromOffset(12, buttonYPositions[1]))
 NRToggleButton = createTextButton(SettingsPanel, "NRToggle", IS_MOBILE and "No Recoil [B]: ON" or "NR (No Recoil) [Key B]: ON", UDim2.fromOffset(12, buttonYPositions[2]))
-GroundGunTPButton = createTextButton(SettingsPanel, "GroundGunTP", IS_MOBILE and "Teleport to Dropped Weapon (D-Pad Right)" or "Teleport to Dropped Vigilante Gun (D-Pad Right)", UDim2.fromOffset(12, buttonYPositions[3]))
-KillerEscapeTPButton = createTextButton(SettingsPanel, "KillerEscapeTP", "Teleport to Killer Escape (D-Pad Down)", UDim2.fromOffset(12, buttonYPositions[4]))
+GroundGunTPButton = createTextButton(SettingsPanel, "GroundGunTP", IS_MOBILE and "Dropped Weapon TP (D-Pad Right)" or "Teleport to Dropped Vigilante Gun (D-Pad Right)", UDim2.fromOffset(12, buttonYPositions[3]))
+KillerEscapeTPButton = createTextButton(SettingsPanel, "KillerEscapeTP", IS_MOBILE and "Killer Escape TP (D-Pad Down)" or "Teleport to Killer Escape (D-Pad Down)", UDim2.fromOffset(12, buttonYPositions[4]))
 GunDropPreviewButton = createTextButton(SettingsPanel, "GunDropPreview", "Preview Gun Drop Sound", UDim2.fromOffset(12, buttonYPositions[5]))
 NotificationPreviewButton = createTextButton(SettingsPanel, "NotificationPreview", "Preview Default Notification", UDim2.fromOffset(12, buttonYPositions[6]))
 

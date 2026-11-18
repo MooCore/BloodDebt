@@ -81,7 +81,7 @@ function notify(title, message, icon, soundId)
     local viewport = getViewportSize()
     local margin = IS_MOBILE and 12 or 20
     local width = math.max(180, math.min(IS_MOBILE and 286 or 330, viewport.X - margin * 2))
-    local height = IS_MOBILE and 78 or 82
+    local height = IS_MOBILE and 82 or 86
     local notification = Instance.new("Frame")
     notification.Name = "Notification"
     notification.Size = UDim2.fromOffset(width, height)
@@ -94,7 +94,7 @@ function notify(title, message, icon, soundId)
     activeNotification = notification
     createCorner(notification, 12)
     createStroke(notification, Color3.fromRGB(255, 45, 65), 1.5)
-    local iconSize = IS_MOBILE and 31 or 35
+    local iconSize = IS_MOBILE and 32 or 36
     local iconImage = Instance.new("ImageLabel")
     iconImage.Size = UDim2.fromOffset(iconSize, iconSize)
     iconImage.Position = UDim2.fromOffset(12, math.floor((height - iconSize) / 2))
@@ -105,8 +105,8 @@ function notify(title, message, icon, soundId)
     iconImage.ZIndex = 101
     iconImage.Parent = notification
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -62, 0, 23)
-    titleLabel.Position = UDim2.fromOffset(55, 8)
+    titleLabel.Size = UDim2.new(1, -68, 0, 23)
+    titleLabel.Position = UDim2.fromOffset(58, 8)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = tostring(title)
     titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -117,12 +117,12 @@ function notify(title, message, icon, soundId)
     titleLabel.ZIndex = 101
     titleLabel.Parent = notification
     local messageLabel = Instance.new("TextLabel")
-    messageLabel.Size = UDim2.new(1, -65, 0, IS_MOBILE and 38 or 40)
-    messageLabel.Position = UDim2.fromOffset(55, 32)
+    messageLabel.Size = UDim2.new(1, -68, 0, IS_MOBILE and 42 or 44)
+    messageLabel.Position = UDim2.fromOffset(58, 33)
     messageLabel.BackgroundTransparency = 1
     messageLabel.Text = tostring(message)
     messageLabel.TextColor3 = Color3.fromRGB(190, 190, 198)
-    messageLabel.TextSize = IS_MOBILE and 10 or 12
+    messageLabel.TextSize = IS_MOBILE and 11 or 12
     messageLabel.Font = Enum.Font.Gotham
     messageLabel.TextWrapped = true
     messageLabel.TextXAlignment = Enum.TextXAlignment.Left
