@@ -1,0 +1,10 @@
+Blood Debt update
+
+Replace the files in this archive at the matching paths in MooCore/BloodDebt on the main branch:
+
+- Script.lua
+- modules/03_UIFoundation.lua
+- modules/04_ESP.lua
+- modules/09_UI.lua
+
+Keep all other existing modules unchanged. The loader continues to download modules from the modules/ folder.

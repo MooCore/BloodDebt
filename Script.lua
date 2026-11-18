@@ -88,7 +88,7 @@ local function makeBootstrap()
     status.Name = "Status"
     status.BackgroundTransparency = 1
     status.Position = UDim2.fromOffset(14, 36)
-    status.Size = UDim2.new(1, -76, 0, 34)
+    status.Size = UDim2.new(1, -94, 0, 34)
     status.Font = Enum.Font.Gotham
     status.Text = "Preparing script modules..."
     status.TextColor3 = Color3.fromRGB(205, 205, 212)
