@@ -4,6 +4,8 @@ aimTargetPlayer = nil
 aimTargetPart = nil
 smoothedAimPosition = nil
 nextAimScanAt = 0
+aimlockTargetWasAcquired = false
+aimlockTargetLost = false
 
 function getCharacterParts(player)
     if not player or player == LocalPlayer then
@@ -87,7 +89,10 @@ function startAimlockHold()
         return
     end
     aimlockHeld = true
+    aimlockTargetWasAcquired = false
+    aimlockTargetLost = false
     aimTargetPlayer, aimTargetPart = getClosestAimPartToCrosshair()
+    aimlockTargetWasAcquired = aimTargetPlayer ~= nil and aimTargetPart ~= nil
     smoothedAimPosition = aimTargetPart and aimTargetPart.Position or nil
     nextAimScanAt = 0
 end
@@ -97,6 +102,8 @@ function stopAimlockHold()
     aimTargetPlayer = nil
     aimTargetPart = nil
     smoothedAimPosition = nil
+    aimlockTargetWasAcquired = false
+    aimlockTargetLost = false
 end
 
 pcall(function()
@@ -111,30 +118,56 @@ RunService:BindToRenderStep("BloodDebt_AimLock", Enum.RenderPriority.Camera.Valu
     if not camera then
         return
     end
+    if aimlockTargetLost then
+        return
+    end
+    if aimlockTargetWasAcquired and not isAimTargetValid() then
+        aimTargetPlayer = nil
+        aimTargetPart = nil
+        smoothedAimPosition = nil
+        aimlockTargetLost = true
+        return
+    end
     local now = os.clock()
     if now >= nextAimScanAt then
         nextAimScanAt = now + AIMLOCK_RESCAN_INTERVAL
         local candidatePlayer, candidatePart, candidateDistance = getClosestAimPartToCrosshair()
         if candidatePlayer and candidatePart then
-            local currentDistance = getScreenDistance(aimTargetPart, camera)
-            local sameCandidate = candidatePlayer == aimTargetPlayer and candidatePart == aimTargetPart
-            local switchMargin = candidatePlayer == aimTargetPlayer and 3 or AIMLOCK_SWITCH_MARGIN
-            if not isAimTargetValid() or sameCandidate or candidateDistance + switchMargin < currentDistance then
-                if not sameCandidate then
-                    aimTargetPlayer = candidatePlayer
-                    aimTargetPart = candidatePart
+            if not aimTargetPlayer then
+                aimTargetPlayer = candidatePlayer
+                aimTargetPart = candidatePart
+                aimlockTargetWasAcquired = true
+                smoothedAimPosition = nil
+            elseif not isAimTargetValid() then
+                aimTargetPlayer = nil
+                aimTargetPart = nil
+                smoothedAimPosition = nil
+                aimlockTargetLost = true
+                return
+            else
+                local currentDistance = getScreenDistance(aimTargetPart, camera)
+                local sameCandidate = candidatePlayer == aimTargetPlayer and candidatePart == aimTargetPart
+                local switchMargin = candidatePlayer == aimTargetPlayer and 3 or AIMLOCK_SWITCH_MARGIN
+                if sameCandidate or candidateDistance + switchMargin < currentDistance then
+                    if not sameCandidate then
+                        aimTargetPlayer = candidatePlayer
+                        aimTargetPart = candidatePart
+                        smoothedAimPosition = nil
+                    end
                 end
             end
-        elseif not isAimTargetValid() then
-            aimTargetPlayer = nil
-            aimTargetPart = nil
         end
     end
-    if not isAimTargetValid() then
-        aimTargetPlayer, aimTargetPart = getClosestAimPartToCrosshair()
-        smoothedAimPosition = nil
-    end
     if not aimTargetPart then
+        return
+    end
+    if not isAimTargetValid() then
+        aimTargetPlayer = nil
+        aimTargetPart = nil
+        smoothedAimPosition = nil
+        if aimlockTargetWasAcquired then
+            aimlockTargetLost = true
+        end
         return
     end
     local targetPosition = aimTargetPart.Position
@@ -153,4 +186,3 @@ RunService:BindToRenderStep("BloodDebt_AimLock", Enum.RenderPriority.Camera.Valu
     local desiredCFrame = CFrame.lookAt(camPos, smoothedAimPosition, camera.CFrame.UpVector)
     camera.CFrame = camera.CFrame:Lerp(desiredCFrame, positionAlpha)
 end)
-

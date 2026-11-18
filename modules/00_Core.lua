@@ -19,7 +19,9 @@ ReplicatedStorage = game:GetService("ReplicatedStorage")
 SoundService = game:GetService("SoundService")
 CoreGui = game:GetService("CoreGui")
 TweenService = game:GetService("TweenService")
-IS_MOBILE = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+IS_MOBILE = UserInputService.TouchEnabled and not (
+    UserInputService.MouseEnabled and UserInputService.KeyboardEnabled
+)
 
 function getViewportSize()
     local camera = Workspace.CurrentCamera
@@ -120,4 +122,3 @@ end
 function normalizeWeaponName(name)
     return normalizeKey(name)
 end
-

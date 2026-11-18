@@ -459,27 +459,27 @@ function createESP(player)
         highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         highlight.Parent = ScreenGui
     end
-    local billboardWidth = IS_MOBILE and 202 or 236
-    local billboardHeight = IS_MOBILE and 44 or 48
+    local billboardWidth = IS_MOBILE and 140 or 156
+    local billboardHeight = IS_MOBILE and 31 or 33
     local billboardGui = Instance.new("BillboardGui")
     billboardGui.Name = "ESPRole_" .. tostring(player.UserId)
     billboardGui.Adornee = rootPart
     billboardGui.Size = UDim2.fromOffset(billboardWidth, billboardHeight)
     billboardGui.AlwaysOnTop = true
-    billboardGui.StudsOffset = Vector3.new(0, IS_MOBILE and 3.35 or 3.6, 0)
+    billboardGui.StudsOffset = Vector3.new(0, IS_MOBILE and 3.0 or 3.15, 0)
     billboardGui.Parent = ScreenGui
 
     local roleText = Instance.new("TextLabel")
     roleText.Name = "RoleText"
     roleText.Parent = billboardGui
-    roleText.Size = UDim2.new(1, -10, 0, 22)
-    roleText.Position = UDim2.fromOffset(5, 0)
+    roleText.Size = UDim2.new(1, -8, 0, IS_MOBILE and 17 or 18)
+    roleText.Position = UDim2.fromOffset(4, 0)
     roleText.Text = "Innocent"
     roleText.TextColor3 = Color3.new(0, 1, 0)
     roleText.BackgroundTransparency = 1
     roleText.TextStrokeTransparency = 0.2
     roleText.Font = Enum.Font.GothamBold
-    roleText.TextSize = IS_MOBILE and 12 or 14
+    roleText.TextSize = IS_MOBILE and 10 or 11
     roleText.TextXAlignment = Enum.TextXAlignment.Center
     roleText.TextYAlignment = Enum.TextYAlignment.Center
     roleText.TextTruncate = Enum.TextTruncate.AtEnd
@@ -487,13 +487,14 @@ function createESP(player)
 
     local healthTrack = Instance.new("Frame")
     healthTrack.Name = "HealthTrack"
-    healthTrack.Position = UDim2.new(0, 9, 1, -13)
-    healthTrack.Size = UDim2.new(1, -18, 0, IS_MOBILE and 7 or 8)
+    healthTrack.AnchorPoint = Vector2.new(0.5, 0.5)
+    healthTrack.Position = UDim2.new(0.5, 0, 1, -6)
+    healthTrack.Size = UDim2.fromOffset(IS_MOBILE and 94 or 110, 4)
     healthTrack.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
     healthTrack.BorderSizePixel = 0
     healthTrack.ClipsDescendants = true
     healthTrack.Parent = billboardGui
-    createCorner(healthTrack, 5)
+    createCorner(healthTrack, 4)
 
     local initialHealth = math.clamp(humanoid.Health / math.max(humanoid.MaxHealth, 1), 0, 1)
     local healthFill = Instance.new("Frame")
@@ -502,7 +503,7 @@ function createESP(player)
     healthFill.BackgroundColor3 = Color3.fromRGB(75, 210, 120)
     healthFill.BorderSizePixel = 0
     healthFill.Parent = healthTrack
-    createCorner(healthFill, 5)
+    createCorner(healthFill, 4)
 
     ESPObjects[player] = {
         Highlight = highlight,
@@ -586,4 +587,3 @@ function updateESP()
         end
     end
 end
-
