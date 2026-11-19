@@ -2,7 +2,6 @@ aimlockHeld = false
 aimlockTriggerDown = false
 aimTargetPlayer = nil
 aimTargetPart = nil
-smoothedAimPosition = nil
 nextAimScanAt = 0
 aimlockTargetWasAcquired = false
 aimlockTargetLost = false
@@ -10,6 +9,7 @@ AIMLOCK_LOCKED_PLAYER = nil
 AIMLOCK_LOCKED_PART_NAME = nil
 AIMLOCK_IS_LOCKED = false
 AIMLOCK_CAMERA_STATE = nil
+AIMLOCK_HUMANOID_STATE = nil
 
 function getCharacterParts(player)
     if not player or player == LocalPlayer then
@@ -85,7 +85,10 @@ function isAimTargetValid()
         return false
     end
     local character, humanoid = getCharacterParts(aimTargetPlayer)
-    return character ~= nil and humanoid ~= nil and aimTargetPart.Parent ~= nil and aimTargetPart:IsDescendantOf(character)
+    return character ~= nil
+        and humanoid ~= nil
+        and aimTargetPart.Parent ~= nil
+        and aimTargetPart:IsDescendantOf(character)
 end
 
 function publishAimlockTarget()
@@ -102,75 +105,81 @@ end
 
 function captureAimlockCamera()
     local camera = Workspace.CurrentCamera
-    if not camera then
-        return
+    if camera then
+        AIMLOCK_CAMERA_STATE = camera
     end
-    AIMLOCK_CAMERA_STATE = {
-        Camera = camera,
-        CameraType = camera.CameraType,
-        CameraSubject = camera.CameraSubject,
-    }
 end
 
 function restoreAimlockCamera()
-    local saved = AIMLOCK_CAMERA_STATE
-    if not saved then
-        return
-    end
-    local camera = Workspace.CurrentCamera
-    if camera and camera == saved.Camera then
-        pcall(function()
-            if camera.CameraType == Enum.CameraType.Scriptable and saved.CameraType then
-                camera.CameraType = saved.CameraType
-            end
-            if saved.CameraSubject and saved.CameraSubject.Parent then
-                camera.CameraSubject = saved.CameraSubject
-            end
-        end)
-    elseif camera then
-        pcall(function()
-            if camera.CameraType == Enum.CameraType.Scriptable then
-                camera.CameraType = Enum.CameraType.Custom
-            end
-            local character = LocalPlayer.Character
-            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                camera.CameraSubject = humanoid
-            end
-        end)
-    end
     AIMLOCK_CAMERA_STATE = nil
 end
 
-function updateAimlockCamera(targetPosition, deltaTime)
+function captureAimlockHumanoid()
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then
+        return nil
+    end
+    if AIMLOCK_HUMANOID_STATE and AIMLOCK_HUMANOID_STATE.Humanoid ~= humanoid then
+        local previous = AIMLOCK_HUMANOID_STATE.Humanoid
+        if previous and previous.Parent then
+            pcall(function()
+                previous.AutoRotate = AIMLOCK_HUMANOID_STATE.AutoRotate
+            end)
+        end
+        AIMLOCK_HUMANOID_STATE = nil
+    end
+    if not AIMLOCK_HUMANOID_STATE then
+        AIMLOCK_HUMANOID_STATE = {
+            Humanoid = humanoid,
+            AutoRotate = humanoid.AutoRotate,
+        }
+    end
+    humanoid.AutoRotate = false
+    return humanoid
+end
+
+function restoreAimlockHumanoid()
+    local saved = AIMLOCK_HUMANOID_STATE
+    AIMLOCK_HUMANOID_STATE = nil
+    if saved and saved.Humanoid and saved.Humanoid.Parent then
+        pcall(function()
+            saved.Humanoid.AutoRotate = saved.AutoRotate
+        end)
+    end
+end
+
+function updateAimlockCamera(targetPosition)
     local camera = Workspace.CurrentCamera
     if not camera or not targetPosition then
         return
     end
-    if not AIMLOCK_CAMERA_STATE or AIMLOCK_CAMERA_STATE.Camera ~= camera then
-        captureAimlockCamera()
-    end
-    if not AIMLOCK_CAMERA_STATE then
-        return
-    end
 
-    -- Keep Roblox's normal Custom camera controller active. Its normal update
-    -- continues to follow the local character and process mouse/touch/gamepad
-    -- input; this lock only adjusts the camera's look direction after that update.
+    captureAimlockHumanoid()
+
     local cameraPosition = camera.CFrame.Position
-    local offset = targetPosition - cameraPosition
-    if offset.Magnitude < 0.05
-        or offset.X ~= offset.X
-        or offset.Y ~= offset.Y
-        or offset.Z ~= offset.Z then
-        return
+    local cameraOffset = targetPosition - cameraPosition
+    if cameraOffset.Magnitude > 0.05
+        and cameraOffset.X == cameraOffset.X
+        and cameraOffset.Y == cameraOffset.Y
+        and cameraOffset.Z == cameraOffset.Z then
+        local upVector = Vector3.new(0, 1, 0)
+        if math.abs(cameraOffset.Unit:Dot(upVector)) > 0.98 then
+            upVector = camera.CFrame.RightVector
+        end
+        camera.CFrame = CFrame.lookAt(cameraPosition, targetPosition, upVector)
+        camera.Focus = CFrame.new(targetPosition)
     end
 
-    local dt = math.clamp(tonumber(deltaTime) or 0.016, 0.0001, 0.25)
-    local alpha = math.clamp(1 - math.exp(-AIMLOCK_SMOOTHING * dt), 0, 1)
-    local desiredCFrame = CFrame.lookAt(cameraPosition, targetPosition, camera.CFrame.UpVector)
-    camera.CFrame = camera.CFrame:Lerp(desiredCFrame, alpha)
-    camera.Focus = CFrame.new(targetPosition)
+    local character = LocalPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if rootPart then
+        local flatTarget = Vector3.new(targetPosition.X, rootPart.Position.Y, targetPosition.Z)
+        local facingOffset = flatTarget - rootPart.Position
+        if facingOffset.Magnitude > 0.05 then
+            rootPart.CFrame = CFrame.lookAt(rootPart.Position, flatTarget, Vector3.new(0, 1, 0))
+        end
+    end
 end
 
 function startAimlockHold()
@@ -185,9 +194,9 @@ function startAimlockHold()
     aimlockTargetLost = false
     aimTargetPlayer, aimTargetPart = getClosestAimPartToCrosshair()
     aimlockTargetWasAcquired = aimTargetPlayer ~= nil and aimTargetPart ~= nil
-    smoothedAimPosition = aimTargetPart and aimTargetPart.Position or nil
     if aimlockTargetWasAcquired then
         captureAimlockCamera()
+        captureAimlockHumanoid()
     end
     publishAimlockTarget()
     nextAimScanAt = 0
@@ -197,18 +206,18 @@ function stopAimlockHold()
     aimlockHeld = false
     aimTargetPlayer = nil
     aimTargetPart = nil
-    smoothedAimPosition = nil
     aimlockTargetWasAcquired = false
     aimlockTargetLost = false
     publishAimlockTarget()
     restoreAimlockCamera()
+    restoreAimlockHumanoid()
 end
 
 pcall(function()
     RunService:UnbindFromRenderStep("BloodDebt_AimLock")
 end)
 
-RunService:BindToRenderStep("BloodDebt_AimLock", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
+RunService:BindToRenderStep("BloodDebt_AimLock", Enum.RenderPriority.Camera.Value + 1, function()
     if not Config.AimlockEnabled or not Config.ScriptReady or not aimlockHeld or not ScriptAlive then
         return
     end
@@ -218,10 +227,10 @@ RunService:BindToRenderStep("BloodDebt_AimLock", Enum.RenderPriority.Camera.Valu
     if aimTargetPlayer and aimlockTargetWasAcquired and not isAimTargetValid() then
         aimTargetPlayer = nil
         aimTargetPart = nil
-        smoothedAimPosition = nil
         aimlockTargetLost = true
         publishAimlockTarget()
         restoreAimlockCamera()
+        restoreAimlockHumanoid()
         return
     end
     local now = os.clock()
@@ -232,8 +241,8 @@ RunService:BindToRenderStep("BloodDebt_AimLock", Enum.RenderPriority.Camera.Valu
             aimTargetPlayer = candidatePlayer
             aimTargetPart = candidatePart
             aimlockTargetWasAcquired = true
-            smoothedAimPosition = candidatePart.Position
             captureAimlockCamera()
+            captureAimlockHumanoid()
             publishAimlockTarget()
         end
     end
@@ -243,21 +252,12 @@ RunService:BindToRenderStep("BloodDebt_AimLock", Enum.RenderPriority.Camera.Valu
     if not isAimTargetValid() then
         aimTargetPlayer = nil
         aimTargetPart = nil
-        smoothedAimPosition = nil
         aimlockTargetLost = true
         publishAimlockTarget()
         restoreAimlockCamera()
+        restoreAimlockHumanoid()
         return
     end
     publishAimlockTarget()
-    local targetPosition = aimTargetPart.Position
-    local dt = math.clamp(tonumber(deltaTime) or 0.016, 0.0001, 0.25)
-    local positionAlpha = math.clamp(1 - math.exp(-AIMLOCK_SMOOTHING * dt), 0, 1)
-    if not smoothedAimPosition then
-        smoothedAimPosition = targetPosition
-    else
-        smoothedAimPosition = smoothedAimPosition:Lerp(targetPosition, positionAlpha)
-    end
-    updateAimlockCamera(smoothedAimPosition, dt)
+    updateAimlockCamera(aimTargetPart.Position)
 end)
-
