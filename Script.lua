@@ -192,6 +192,7 @@ local MODULES = {
     "07_Controller.lua",
     "08_NoRecoil.lua",
     "09_UI.lua",
+    "11_AdvancedFeatures.lua",
     "10_Lifecycle.lua",
 }
 

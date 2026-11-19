@@ -1,10 +1,13 @@
-Blood Debt update
+Blood Debt advanced-features update
 
-Replace the files in this archive at the matching paths in MooCore/BloodDebt on the main branch:
+This is a PATCH archive for the existing MooCore/BloodDebt repository, not a replacement for the whole repository.
 
-- Script.lua
-- modules/03_UIFoundation.lua
-- modules/04_ESP.lua
-- modules/09_UI.lua
+Upload/merge these paths into the repository root on the main branch:
 
-Keep all other existing modules unchanged. The loader continues to download modules from the modules/ folder.
+1. Replace Script.lua with the Script.lua in this archive.
+2. Add modules/11_AdvancedFeatures.lua at that exact path.
+3. The README.md in this archive is an updated copy; replace the existing README.md if you want the module list and feature notes updated.
+
+Keep all existing files in modules/ unchanged. In particular, keep 00_Core.lua through 10_Lifecycle.lua, including your current role database, map database, UI, aimlock, controller and no-recoil modules.
+
+The updated loader runs 11_AdvancedFeatures.lua after 09_UI.lua and before 10_Lifecycle.lua, so the new controls use your existing UI helpers and the existing map/weapon role resolver. The current dropped-weapon ESP toggle and teleport control now also cover dropped Killer and special Juggernaut weapons, alongside Vigilante weapons. The existing panel layout is retained; the weapon control labels now say Role Weapon ESP / Dropped Role Weapon.
