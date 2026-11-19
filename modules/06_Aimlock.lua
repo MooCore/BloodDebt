@@ -105,19 +105,10 @@ function captureAimlockCamera()
     if not camera then
         return
     end
-    local localCharacter = LocalPlayer.Character
-    local rootPart = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
-    local offset = nil
-    if rootPart then
-        offset = rootPart.CFrame:PointToObjectSpace(camera.CFrame.Position)
-    end
     AIMLOCK_CAMERA_STATE = {
         Camera = camera,
         CameraType = camera.CameraType,
         CameraSubject = camera.CameraSubject,
-        CameraCFrame = camera.CFrame,
-        CameraFocus = camera.Focus,
-        LocalOffset = offset,
     }
 end
 
@@ -127,59 +118,57 @@ function restoreAimlockCamera()
         return
     end
     local camera = Workspace.CurrentCamera
-    if camera then
-        if saved.Camera == camera then
-            pcall(function()
-                camera.CameraType = saved.CameraType or Enum.CameraType.Custom
-                if saved.CameraSubject then
-                    camera.CameraSubject = saved.CameraSubject
-                end
-                camera.CFrame = saved.CameraCFrame
-                camera.Focus = saved.CameraFocus
-            end)
-        else
-            pcall(function()
+    if camera and camera == saved.Camera then
+        pcall(function()
+            if camera.CameraType == Enum.CameraType.Scriptable and saved.CameraType then
+                camera.CameraType = saved.CameraType
+            end
+            if saved.CameraSubject and saved.CameraSubject.Parent then
+                camera.CameraSubject = saved.CameraSubject
+            end
+        end)
+    elseif camera then
+        pcall(function()
+            if camera.CameraType == Enum.CameraType.Scriptable then
                 camera.CameraType = Enum.CameraType.Custom
-                local character = LocalPlayer.Character
-                local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    camera.CameraSubject = humanoid
-                end
-            end)
-        end
+            end
+            local character = LocalPlayer.Character
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                camera.CameraSubject = humanoid
+            end
+        end)
     end
     AIMLOCK_CAMERA_STATE = nil
 end
 
 function updateAimlockCamera(targetPosition, deltaTime)
     local camera = Workspace.CurrentCamera
-    if not camera then
+    if not camera or not targetPosition then
         return
     end
     if not AIMLOCK_CAMERA_STATE or AIMLOCK_CAMERA_STATE.Camera ~= camera then
-        if AIMLOCK_CAMERA_STATE then
-            restoreAimlockCamera()
-        end
         captureAimlockCamera()
     end
-    local saved = AIMLOCK_CAMERA_STATE
-    if not saved then
+    if not AIMLOCK_CAMERA_STATE then
         return
     end
-    local localCharacter = LocalPlayer.Character
-    local rootPart = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+
+    -- Keep Roblox's normal Custom camera controller active. Its normal update
+    -- continues to follow the local character and process mouse/touch/gamepad
+    -- input; this lock only adjusts the camera's look direction after that update.
     local cameraPosition = camera.CFrame.Position
-    if rootPart and saved.LocalOffset then
-        cameraPosition = rootPart.CFrame:PointToWorldSpace(saved.LocalOffset)
-    end
     local offset = targetPosition - cameraPosition
-    if offset.Magnitude < 0.05 or offset.X ~= offset.X or offset.Y ~= offset.Y or offset.Z ~= offset.Z then
+    if offset.Magnitude < 0.05
+        or offset.X ~= offset.X
+        or offset.Y ~= offset.Y
+        or offset.Z ~= offset.Z then
         return
     end
+
     local dt = math.clamp(tonumber(deltaTime) or 0.016, 0.0001, 0.25)
     local alpha = math.clamp(1 - math.exp(-AIMLOCK_SMOOTHING * dt), 0, 1)
     local desiredCFrame = CFrame.lookAt(cameraPosition, targetPosition, camera.CFrame.UpVector)
-    camera.CameraType = Enum.CameraType.Scriptable
     camera.CFrame = camera.CFrame:Lerp(desiredCFrame, alpha)
     camera.Focus = CFrame.new(targetPosition)
 end
