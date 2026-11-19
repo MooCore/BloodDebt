@@ -10,6 +10,7 @@ Config.BulletRedirectWallcheck = false
 Config.BulletRedirectTargetPart = "Torso"
 Config.BulletRedirectRadius = 150
 Config.BulletRedirectFOVVisible = true
+Config.BulletRedirectFollowAimlock = true
 Config.HintESPEnabled = false
 
 local redirectRoleOptions = { "Killer", "Vigilante", "Innocent", "All" }
@@ -411,15 +412,15 @@ end
 local originalFire = FastCast.Fire
 local function getTargetPart(character, selectedPart)
     local part = character:FindFirstChild(selectedPart)
-    if part then
+    if part and part:IsA("BasePart") then
         return part
     end
     if selectedPart == "Torso" then
-        return character:FindFirstChild("UpperTorso") or character:FindFirstChild("LowerTorso") or character:FindFirstChild("HumanoidRootPart")
+        return character:FindFirstChild("UpperTorso") or character:FindFirstChild("LowerTorso") or character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart")
     end
-    return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+    return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso") or character:FindFirstChild("Head")
 end
-local function hasClearLine(camera, localCharacter, targetCharacter, targetPosition)
+local function hasClearLine(localCharacter, targetCharacter, targetPosition, shotOrigin)
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     local excluded = { targetCharacter }
@@ -428,10 +429,47 @@ local function hasClearLine(camera, localCharacter, targetCharacter, targetPosit
     end
     params.FilterDescendantsInstances = excluded
     params.IgnoreWater = true
-    local result = Workspace:Raycast(camera.CFrame.Position, targetPosition - camera.CFrame.Position, params)
-    return result == nil
+    local origin = typeof(shotOrigin) == "Vector3" and shotOrigin or (Workspace.CurrentCamera and Workspace.CurrentCamera.CFrame.Position)
+    if not origin then
+        return false
+    end
+    return Workspace:Raycast(origin, targetPosition - origin, params) == nil
 end
-local function chooseTarget(config)
+local function getValidCharacter(player)
+    if not player or player == Players.LocalPlayer then
+        return nil, nil
+    end
+    local character = player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not character or not character.Parent or not humanoid or humanoid.Health <= 0 then
+        return nil, nil
+    end
+    return character, humanoid
+end
+local function chooseLockedAimTarget(config, shotOrigin)
+    local userId = tonumber(config.LockTargetUserId) or 0
+    if not config.FollowAimlock or userId <= 0 then
+        return nil, nil, false
+    end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.UserId == userId then
+            local character = getValidCharacter(player)
+            if not character then
+                return nil, nil, true
+            end
+            local part = getTargetPart(character, config.LockTargetPart or config.TargetPart or "Torso")
+            if not part or not part:IsA("BasePart") then
+                return nil, nil, true
+            end
+            if config.Wallcheck and not hasClearLine(Players.LocalPlayer.Character, character, part.Position, shotOrigin) then
+                return nil, nil, true
+            end
+            return player, part, true
+        end
+    end
+    return nil, nil, true
+end
+local function chooseRoleTarget(config, shotOrigin)
     local camera = Workspace.CurrentCamera
     local localPlayer = Players.LocalPlayer
     if not camera or not localPlayer then
@@ -444,9 +482,8 @@ local function chooseTarget(config)
     local bestDistance = math.huge
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer and config.ValidTargets and config.ValidTargets[player.Name] then
-            local character = player.Character
-            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            if character and character.Parent and humanoid and humanoid.Health > 0 then
+            local character = getValidCharacter(player)
+            if character then
                 local part = getTargetPart(character, config.TargetPart or "Torso")
                 if part and part:IsA("BasePart") then
                     local screenPosition = camera:WorldToViewportPoint(part.Position)
@@ -454,10 +491,7 @@ local function chooseTarget(config)
                         local distance = (Vector2.new(screenPosition.X, screenPosition.Y) - center).Magnitude
                         local radius = tonumber(config.Radius) or 150
                         if (radius <= 0 or distance <= radius) and distance < bestDistance then
-                            local clear = true
-                            if config.Wallcheck then
-                                clear = hasClearLine(camera, localPlayer.Character, character, part.Position)
-                            end
+                            local clear = not config.Wallcheck or hasClearLine(localPlayer.Character, character, part.Position, shotOrigin)
                             if clear then
                                 bestDistance = distance
                                 bestPlayer = player
@@ -471,10 +505,17 @@ local function chooseTarget(config)
     end
     return bestPlayer, bestPart
 end
+local function chooseTarget(config, shotOrigin)
+    local lockedPlayer, lockedPart, lockIsActive = chooseLockedAimTarget(config, shotOrigin)
+    if lockIsActive then
+        return lockedPlayer, lockedPart
+    end
+    return chooseRoleTarget(config, shotOrigin)
+end
 FastCast.Fire = function(self, origin, direction, velocity, behavior)
     local config = env.__BloodDebtBulletRedirectConfig
     if config and config.Enabled then
-        local target, targetPart = chooseTarget(config)
+        local target, targetPart = chooseTarget(config, origin)
         local hitChance = math.clamp(tonumber(config.HitChance) or 100, 0, 100)
         if target and targetPart and math.random(1, 100) <= hitChance then
             local offset = targetPart.Position - origin
@@ -505,6 +546,12 @@ local function serializeTargetNames(targetNames)
 end
 
 local function buildRedirectConfigSource(targetNames)
+    local lockUserId = 0
+    local lockPartName = Config.BulletRedirectTargetPart
+    if Config.BulletRedirectFollowAimlock and aimlockHeld and AIMLOCK_IS_LOCKED and AIMLOCK_LOCKED_PLAYER and AIMLOCK_LOCKED_PART_NAME then
+        lockUserId = tonumber(AIMLOCK_LOCKED_PLAYER.UserId) or 0
+        lockPartName = tostring(AIMLOCK_LOCKED_PART_NAME)
+    end
     return string.format([[
 local env = (type(getgenv) == "function" and getgenv()) or _G
 env.__BloodDebtBulletRedirectConfig = {
@@ -514,6 +561,9 @@ env.__BloodDebtBulletRedirectConfig = {
     TargetPart = %q,
     Radius = %d,
     ValidTargets = %s,
+    FollowAimlock = %s,
+    LockTargetUserId = %d,
+    LockTargetPart = %q,
 }
 ]],
         tostring(Config.BulletRedirectEnabled),
@@ -521,7 +571,10 @@ env.__BloodDebtBulletRedirectConfig = {
         tostring(Config.BulletRedirectWallcheck),
         tostring(Config.BulletRedirectTargetPart),
         math.max(0, math.floor(tonumber(Config.BulletRedirectRadius) or 150)),
-        serializeTargetNames(targetNames)
+        serializeTargetNames(targetNames),
+        tostring(Config.BulletRedirectFollowAimlock),
+        lockUserId,
+        lockPartName
     )
 end
 
@@ -577,7 +630,8 @@ local function runBulletRedirectSync()
     if #actors == 0 then
         return
     end
-    local targetNames = Config.BulletRedirectEnabled and collectValidRedirectTargets() or {}
+    local aimlockTargetActive = Config.BulletRedirectFollowAimlock and aimlockHeld and AIMLOCK_IS_LOCKED and AIMLOCK_LOCKED_PLAYER ~= nil
+    local targetNames = Config.BulletRedirectEnabled and not aimlockTargetActive and collectValidRedirectTargets() or {}
     local configSource = buildRedirectConfigSource(targetNames)
     local now = os.clock()
     for _, weaponActor in ipairs(actors) do
@@ -610,7 +664,7 @@ local function setBulletRedirectEnabled(enabled, notifyUser)
     if notifyUser then
         notify(
             Config.BulletRedirectEnabled and "Bullet Redirect Enabled" or "Bullet Redirect Disabled",
-            Config.BulletRedirectEnabled and "Local weapon projectiles will redirect toward the selected detected role." or "Projectile redirection has been disabled.",
+            Config.BulletRedirectEnabled and "Redirect prioritizes your active aimlock target; otherwise it uses the selected role." or "Projectile redirection has been disabled.",
             Config.BulletRedirectEnabled and Icons.Success or Icons.Info,
             Sounds.Notification
         )
@@ -728,7 +782,7 @@ AdvancedDescription.BackgroundTransparency = 1
 AdvancedDescription.Position = UDim2.fromOffset(14, 35)
 AdvancedDescription.Size = UDim2.new(1, -28, 0, 18)
 AdvancedDescription.Font = Enum.Font.Gotham
-AdvancedDescription.Text = "Uses the existing map and weapon role database."
+AdvancedDescription.Text = "Prioritizes your locked aim target, then the selected role."
 AdvancedDescription.TextColor3 = Color3.fromRGB(175, 180, 190)
 AdvancedDescription.TextSize = IS_MOBILE and 8 or 9
 AdvancedDescription.TextXAlignment = Enum.TextXAlignment.Left
@@ -786,6 +840,7 @@ refreshAdvancedOptions = function()
         "FOV Visible: " .. (Config.BulletRedirectFOVVisible and "ON" or "OFF"),
         "Hint Match ESP: " .. (Config.HintESPEnabled and "ON" or "OFF"),
         "Nametag Display: " .. nametagMode,
+        "Follow Aimlock Target: " .. (Config.BulletRedirectFollowAimlock and "ON" or "OFF"),
     }
     for index, text in ipairs(texts) do
         local button = getAdvancedButton(index)
@@ -795,7 +850,8 @@ refreshAdvancedOptions = function()
                 button.BackgroundColor3 = Color3.fromRGB(145, 30, 48)
             elseif (index == 4 and Config.BulletRedirectWallcheck)
                 or (index == 7 and Config.BulletRedirectFOVVisible)
-                or (index == 8 and Config.HintESPEnabled) then
+                or (index == 8 and Config.HintESPEnabled)
+                or (index == 10 and Config.BulletRedirectFollowAimlock) then
                 button.BackgroundColor3 = Color3.fromRGB(95, 55, 65)
             else
                 button.BackgroundColor3 = Color3.fromRGB(42, 42, 50)
@@ -856,7 +912,12 @@ createAdvancedOption("NametagMode", 268, function()
     refreshAdvancedOptions()
     updateESP()
 end)
-AdvancedOptionsScroll.CanvasSize = UDim2.fromOffset(0, 303)
+createAdvancedOption("FollowAimlockTarget", 301, function()
+    Config.BulletRedirectFollowAimlock = not Config.BulletRedirectFollowAimlock
+    refreshAdvancedOptions()
+    runBulletRedirectSync()
+end)
+AdvancedOptionsScroll.CanvasSize = UDim2.fromOffset(0, 336)
 
 refreshAdvancedOptions()
 
@@ -903,7 +964,8 @@ end
 task.spawn(function()
     while ScriptAlive and ScreenGui and ScreenGui.Parent do
         runBulletRedirectSync()
-        task.wait(0.5)
+        local lockSyncActive = Config.BulletRedirectEnabled and Config.BulletRedirectFollowAimlock and aimlockHeld
+        task.wait(lockSyncActive and 0.1 or 0.35)
     end
 end)
 
