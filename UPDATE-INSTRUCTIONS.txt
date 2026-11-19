@@ -5,9 +5,10 @@ This is a PATCH archive for the existing MooCore/BloodDebt repository, not a rep
 Upload/merge these paths into the repository root on the main branch:
 
 1. Replace Script.lua with the Script.lua in this archive.
-2. Add modules/11_AdvancedFeatures.lua at that exact path.
-3. The README.md in this archive is an updated copy; replace the existing README.md if you want the module list and feature notes updated.
+2. Replace modules/06_Aimlock.lua with the updated file in this archive.
+3. Add modules/11_AdvancedFeatures.lua at that exact path.
+4. The README.md in this archive is an updated copy; replace the existing README.md if you want the module list and feature notes updated.
 
-Keep all existing files in modules/ unchanged. In particular, keep 00_Core.lua through 10_Lifecycle.lua, including your current role database, map database, UI, aimlock, controller and no-recoil modules.
+Keep all other existing files in modules/ unchanged, including your current role database, map database, UI, controller and no-recoil modules.
 
-The updated loader runs 11_AdvancedFeatures.lua after 09_UI.lua and before 10_Lifecycle.lua, so the new controls use your existing UI helpers and the existing map/weapon role resolver. The current dropped-weapon ESP toggle and teleport control now also cover dropped Killer and special Juggernaut weapons, alongside Vigilante weapons. The existing panel layout is retained; the weapon control labels now say Role Weapon ESP / Dropped Role Weapon.
+The updated loader runs 11_AdvancedFeatures.lua after 09_UI.lua and before 10_Lifecycle.lua. The aimlock now holds the selected player until the lock is released or the target becomes invalid, temporarily switches the camera to Scriptable while held, follows the local character's camera offset, and restores the prior camera settings on release. Bullet Redirect now prioritizes the exact active aimlock target (by UserId and the actual locked body part) regardless of the selected role filter; role-based targeting is used when no player is locked. The Follow Aimlock Target option is enabled by default and can be changed in Advanced Settings. Keep the rest of the original role/weapon resolver and UI intact. The dropped-weapon ESP and teleport controls continue to cover dropped Killer, special Juggernaut, and Vigilante weapons. The existing panel layout is retained; the weapon control labels now say Role Weapon ESP / Dropped Role Weapon.
